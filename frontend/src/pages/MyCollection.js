@@ -10,24 +10,49 @@ const MyCollection = ({ walletAddress }) => {
 
   useEffect(() => {
     if (!walletAddress) {
+      setMyNFTs([]);
       setLoading(false);
       return;
     }
-    loadMyNFTs();
+    fetchMyNFTs();
   }, [walletAddress]);
 
-  const loadMyNFTs = async () => {
-    // Dữ liệu mẫu - sau này sẽ thay thế bằng dữ liệu từ blockchain
-    const mockMyNFTs = [
-      // Nếu user đã mint NFT thì sẽ hiển thị ở đây
-    ];
+  // =================== FETCH NFT TỪ BACKEND ===================
+  const fetchMyNFTs = async () => {
+    setLoading(true);
+    try {
+      const url = `http://localhost:5000/api/nft/all?owner=${walletAddress}`;
+      console.log("Fetching NFTs from:", url);
 
-    setTimeout(() => {
-      setMyNFTs(mockMyNFTs);
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Backend error ${res.status}: ${txt}`);
+      }
+
+      const data = await res.json();
+      console.log("Fetched NFTs:", data);
+
+      // Chuẩn hóa dữ liệu cho frontend
+      const processedNFTs = (data.items || []).map((nft) => ({
+        id: `${nft.tokenAddress}-${nft.tokenId}`,
+        tokenId: nft.tokenId,
+        contract: nft.tokenAddress,
+        name: nft.title || nft.rawMetadata?.name || `NFT #${nft.tokenId}`,
+        description: nft.description || nft.rawMetadata?.description || "",
+        image: nft.image || nft.rawMetadata?.image?.replace("ipfs://", "https://ipfs.io/ipfs/") || "/placeholder.png",
+      }));
+
+      setMyNFTs(processedNFTs);
+    } catch (err) {
+      console.error("❌ Error loading NFTs:", err);
+      setMyNFTs([]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
+  // =================== RENDER ===================
   if (!walletAddress) {
     return (
       <div className="my-collection">
