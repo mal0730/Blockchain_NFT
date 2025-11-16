@@ -1,7 +1,14 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import "./NFTCard.css";
 
 const NFTCard = ({ nft, onBuy }) => {
+  const navigate = useNavigate();
+
+  const handleViewDetails = () => {
+    navigate(`/nft/${nft.id}`);
+  };
+
   return (
     <div className="nft-card">
       <div className="nft-image-container">
@@ -14,15 +21,22 @@ const NFTCard = ({ nft, onBuy }) => {
           <p className="nft-description">{nft.description}</p>
         )}
         <div className="nft-footer">
-          <div className="nft-price-section">
-            <span className="price-label">Price</span>
-            <span className="price-value">{nft.price} ETH</span>
-          </div>
-          {onBuy && (
-            <button className="btn-buy" onClick={() => onBuy(nft)}>
-              Buy Now
-            </button>
+          {nft.price && (
+            <div className="nft-price-section">
+              <span className="price-label">Price</span>
+              <span className="price-value">{nft.price} ETH</span>
+            </div>
           )}
+          <div className="nft-actions">
+            <button className="btn-view-details" onClick={handleViewDetails}>
+              Xem chi tiết
+            </button>
+            {onBuy && nft.price && (
+              <button className="btn-buy" onClick={() => onBuy(nft)}>
+                Buy Now
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
