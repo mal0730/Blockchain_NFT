@@ -3,6 +3,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import nftRoutes from "./routes/nftRoutes.js";
+import connectDB from './db/connect.js';
 
 
 dotenv.config();
@@ -17,6 +18,17 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/nft", nftRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await connectDB();
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+  } catch(error) {
+    console.error('❌ Lỗi khởi động server:', error.message);
+    process.exit(1);
+  }
+}
+
+startServer();
