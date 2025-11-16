@@ -3,11 +3,14 @@ import { useNavigate } from "react-router-dom";
 import "./NFTCard.css";
 
 const NFTCard = ({ nft, onBuy }) => {
-  const navigate = useNavigate();
+  //fallback khi không có image
+  const imageSrc =
+    nft.image && nft.image !== ""
+      ? nft.image
+      : "https://via.placeholder.com/300x300?text=No+Image";
 
-  const handleViewDetails = () => {
-    navigate(`/nft/${nft.id}`);
-  };
+  //fallback giá trị price (nếu không có thì ẩn phần giá)
+  const hasPrice = nft.price !== undefined && nft.price !== null;
 
   return (
     <div className="nft-card">
