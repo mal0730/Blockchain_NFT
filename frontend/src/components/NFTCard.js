@@ -2,6 +2,15 @@ import React from "react";
 import "./NFTCard.css";
 
 const NFTCard = ({ nft, onBuy }) => {
+   //fallback khi không có image
+  const imageSrc =
+    nft.image && nft.image !== ""
+      ? nft.image
+      : "https://via.placeholder.com/300x300?text=No+Image";
+
+  //fallback giá trị price (nếu không có thì ẩn phần giá)
+  const hasPrice = nft.price !== undefined && nft.price !== null;
+  
   return (
     <div className="nft-card">
       <div className="nft-image-container">
