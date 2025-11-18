@@ -10,24 +10,25 @@ export const handleMint = async (req, res) => {
 
     // 1️⃣ Upload ảnh lên Pinata
     const imageResult = await pinataUploadFile(req.file.path);
+    const imageUrl = `ipfs://${imageResult.IpfsHash}`;
 
-    // Xóa file tạm
     fs.unlinkSync(req.file.path);
 
-    console.log("✅ Image uploaded to Pinata:", imageResult.IpfsHash);
+    console.log("✅ Image uploaded to Pinata:", imageUrl);
 
     // 2️⃣ Upload metadata lên Pinata
     const metadata = {
       name: req.body.name,
       description: req.body.description || "",
-      image: `ipfs://${imageResult.IpfsHash}`,
+      image:  imageUrl,
     };
 
     const metadataResult = await pinataUploadJSON(metadata);
-    console.log("✅ Metadata uploaded to Pinata:", metadataResult.IpfsHash);
+    const tokenURI = `ipfs://${metadataResult.IpfsHash}`;
+    console.log("✅ Metadata uploaded to Pinata:", tokenURI);
 
     // 3️⃣ Trả về tokenURI cho frontend
-    res.json({ tokenURI: `ipfs://${metadataResult.IpfsHash}` });
+    res.json({ tokenURI: tokenURI, imageUrl: imageUrl });
 
   } catch (err) {
     console.error("❌ Error in handleMint:", err.response?.data || err.message);

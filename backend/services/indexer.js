@@ -6,16 +6,30 @@ import fetch from 'node-fetch'; // 👈 Cần thiết để tải metadata
 
 // --- Cấu hình ---
 const CONTRACT_ADDRESS = "0x260cC80dC1e4D6075dD205CbA665Ad38F2aF961e"; // 👈 Địa chỉ Contract của bạn
-const ALCHEMY_RPC_URL = process.env.ALCHEMY_RPC_URL_SEPOLIA; 
+// Lấy url từ env và loại bỏ dấu ngoặc kép nếu có (do một số .env lưu kèm ")
+const rawRpc = process.env.ALCHEMY_RPC_URL_SEPOLIA || "";
+const rawWss = process.env.ALCHEMY_WSS_URL_SEPOLIA || "";
+const ALCHEMY_RPC_URL = rawRpc.replace(/^\"|\"$/g, "");
+const ALCHEMY_WSS_URL = rawWss.replace(/^\"|\"$/g, "");
 
-// Sử dụng JsonRpcProvider để kết nối ổn định
-const provider = new ethers.JsonRpcProvider(ALCHEMY_RPC_URL); 
+// Sử dụng HTTP JsonRpcProvider (không dùng WSS theo yêu cầu)
+const provider = new ethers.JsonRpcProvider(ALCHEMY_RPC_URL);
+console.log('ℹ️ Indexer: sử dụng JsonRpcProvider (HTTP) ->', ALCHEMY_RPC_URL);
+
 const contract = new ethers.Contract(CONTRACT_ADDRESS, contractData.abi, provider);
 
 /**
  * Hàm trợ giúp: Tải metadata từ IPFS/Pinata
  * (Bạn cần thay thế gateway nếu muốn)
  */
+
+const getTransactionHash = async (event) => {
+    // 1. Dùng getTransactionReceipt() để lấy dữ liệu nặng
+    const receipt = await event.getTransactionReceipt();
+    // 2. Hash nằm trong receipt.hash
+    return receipt.hash;
+};
+
 const fetchMetadata = async (tokenURI) => {
     // Chuyển đổi 'ipfs://' thành URL http
     const httpUrl = tokenURI.replace("ipfs://", "https://gateway.pinata.cloud/ipfs/");
@@ -50,7 +64,7 @@ const fetchMetadata = async (tokenURI) => {
 export const startEventListener = () => {
     console.log("🎧 Indexer đang lắng nghe sự kiện blockchain...");
 
-    // ✅ SỬA LỖI 1: BỎ COMMENT VÀ TRIỂN KHAI NFTMINTED
+    
     contract.on("NFTMinted", async (creator, tokenId, event) => {
         console.log(`SỰ KIỆN: Token ${tokenId} được Mint bởi ${creator}`);
 
@@ -61,6 +75,7 @@ export const startEventListener = () => {
 
             // Lấy thông tin Off-chain (từ Pinata)
             const metadata = await fetchMetadata(tokenURI);
+            const txHash = await getTransactionHash(event);
 
             // Tạo NFT mới trong DB
             const newNFT = new NFT({
@@ -80,7 +95,7 @@ export const startEventListener = () => {
                 isAuctionActive: false
             });
 
-            await newNFT.save(); // Lưu vào MongoDB
+            await newNFT.save();
             console.log(`✅ Đã lưu Token ${tokenId} vào DB.`);
 
             // Ghi lại Lịch sử Mint
@@ -89,8 +104,10 @@ export const startEventListener = () => {
                 tokenId: tokenId.toString(),
                 from: "0x0000000000000000000000000000000000000000",
                 to: creator.toLowerCase(),
-                txHash: event.log.transactionHash
+                txHash: txHash
             }).save();
+
+            console.log(`✅ INDEXER ĐÃ BẮT VÀ LƯU TX HASH: ${event.transactionHash}`);
 
         } catch (error) {
             // Xử lý lỗi trùng lặp (nếu Indexer chạy lại)
@@ -101,31 +118,53 @@ export const startEventListener = () => {
             }
         }
     });
-    
+
     // ✅ SỬA LỖI 2: SỬA LOGIC CẬP NHẬT KHI NIÊM YẾT
-    contract.on("NFTListed", (seller, tokenId, price, event) => {
-        console.log(`SỰ KIỆN: Token ${tokenId} được niêm yết bởi ${seller} với giá ${price}`);
-        
-        NFT.findOneAndUpdate(
-            { tokenId: tokenId.toString() },
-            { 
-                isListed: true, 
-                listingPrice: price.toString(),
-                listingSeller: seller.toLowerCase()
-                // 🛑 BỎ DÒNG CẬP NHẬT OWNER (Vì owner vẫn là seller)
-            },
-            { new: true }
-        ).exec();
-        
-        // Ghi lại Lịch sử
-        new Activity({
-            eventType: 'List',
-            tokenId: tokenId.toString(),
-            from: seller.toLowerCase(),
-            price: price.toString(),
-            txHash: event.log.transactionHash
-        }).save();
-    });
+    contract.on("NFTListed", async (seller, tokenId, price, event) => {
+        console.log(`SỰ KIỆN: Token ${tokenId} được niêm yết bởi ${seller} với giá ${price}`);
+
+        try {
+            const txHash = await getTransactionHash(event);
+            const updated = await NFT.findOneAndUpdate(
+                { tokenId: tokenId.toString() },
+                {
+                    isListed: true,
+                    listingPrice: price.toString(),
+                    listingSeller: seller.toLowerCase()
+                },
+                { new: true, 
+                  upsert: true
+                }
+            ).exec();
+
+            if (!updated) {
+                console.warn(`⚠️ NFT ${tokenId} chưa tồn tại trong DB khi cố cập nhật listing.`);
+            } else {
+                console.log(`✅ Đã cập nhật listing cho Token ${tokenId} trong DB.`);
+            }
+
+            // Ghi lại Lịch sử (tránh crash nếu duplicate txHash)
+            try {
+                await new Activity({
+                    eventType: 'List',
+                    tokenId: tokenId.toString(),
+                    from: seller.toLowerCase(),
+                    price: price.toString(),
+                    txHash: txHash
+                }).save();
+                console.log(`✅ Đã lưu Activity List cho ${tokenId} - tx ${event.transactionHash}`);
+            } catch (actErr) {
+                if (actErr.code === 11000) {
+                    console.warn(`⚠️ Activity với txHash ${event.transactionHash} đã tồn tại, bỏ qua.`);
+                } else {
+                    console.error('❌ Lỗi lưu Activity (List):', actErr.message);
+                }
+            }
+
+        } catch (error) {
+            console.error(`❌ Lỗi xử lý NFTListed cho token ${tokenId}:`, error.message);
+        }
+    });
 
     // ✅ SỬA LỖI 3: SỬA LOGIC LẤY 'SELLER' KHI MUA
     contract.on("NFTBought", async (buyer, tokenId, price, event) => {
@@ -134,6 +173,7 @@ export const startEventListener = () => {
         // 1. Lấy thông tin seller từ DB (vì event không có)
         const nft = await NFT.findOne({ tokenId: tokenId.toString() });
         const seller = nft ? nft.listingSeller : "Không rõ"; // Lấy người bán cũ
+        const txHash = await getTransactionHash(event);
 
         // 2. Cập nhật DB
         await NFT.findOneAndUpdate(
@@ -153,7 +193,7 @@ export const startEventListener = () => {
             from: seller, // 👈 Đã lấy seller từ DB
             to: buyer.toLowerCase(),
             price: price.toString(),
-            txHash: event.log.transactionHash
+            txHash: txHash
         }).save();
     });
 
