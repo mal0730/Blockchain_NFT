@@ -88,7 +88,10 @@ function App() {
           connectWallet={handleConnectWallet} // Gọi hàm mở hộp thoại MetaMask
         />
         <Routes>
-          <Route path="/" element={<Home walletAddress={walletAddress} />} />
+          <Route
+            path="/"
+            element={<Home walletAddress={walletAddress} signer={signer} />}
+          />
           <Route
             path="/mint"
             // TRUYỀN SIGNER XUỐNG COMPONENT MINTNFT

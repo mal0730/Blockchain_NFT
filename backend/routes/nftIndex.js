@@ -11,10 +11,11 @@ router.get("/all", async (req, res) => {
     const pageKey = req.query.pageKey || "";
     const ALCHEMY_KEY = process.env.ALCHEMY_API_KEY;
     const BASE = process.env.ALCHEMY_BASE || "https://eth-sepolia.g.alchemy.com/nft/v2";
+    const CONTRACT_ADDRESS = process.env.MARKETPLACE_ADDRESS;
 
     // Alchemy GET endpoint: getNFTs
     // Docs: https://docs.alchemy.com/reference/nft-api-quickstart
-    let url = `${BASE}/${ALCHEMY_KEY}/getNFTs/?owner=${owner}&withMetadata=true`;
+    let url = `${BASE}/${ALCHEMY_KEY}/getNFTs/?owner=${owner}&withMetadata=true&contractAddresses[]=${CONTRACT_ADDRESS}`;
     if (pageKey) url += `&pageKey=${pageKey}`;
 
     const r = await fetch(url);

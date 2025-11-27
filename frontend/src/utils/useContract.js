@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import contractData from "../NFTMarketPlace.json";
 
 // Đảm bảo địa chỉ này đã được cập nhật chính xác
-const CONTRACT_ADDRESS = "0x05C34E666dB428EB5a6782279AABeF60273c9c2f";
+const CONTRACT_ADDRESS = "0x260cC80dC1e4D6075dD205CbA665Ad38F2aF961e";
 
 /**
  * @desc Hook để khởi tạo Smart Contract.

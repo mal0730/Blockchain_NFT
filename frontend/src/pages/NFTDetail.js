@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ethers } from "ethers";
 import "./NFTDetail.css";
@@ -9,15 +9,9 @@ const NFTDetail = ({ walletAddress, signer }) => {
   const navigate = useNavigate();
   const { contract } = useContract(signer);
 
-  // Parse tokenId từ URL
-  // Nếu tokenId có dạng "0xAddress-10" thì lấy phần sau dấu -
-  // Nếu chỉ là "10" thì giữ nguyên
   const tokenId = rawTokenId.includes("-")
     ? rawTokenId.split("-")[1]
     : rawTokenId;
-
-  console.log("📍 Raw Token ID from URL:", rawTokenId);
-  console.log("📍 Parsed Token ID:", tokenId);
 
   const [nftData, setNftData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,165 +19,104 @@ const NFTDetail = ({ walletAddress, signer }) => {
   const [listPrice, setListPrice] = useState("");
   const [isListing, setIsListing] = useState(false);
 
-  useEffect(() => {
-    console.log(
-      "🔍 NFTDetail useEffect - Contract:",
-      contract,
-      "TokenId:",
-      tokenId
-    );
-
-    if (contract && tokenId) {
-      loadNFTDetails();
-    } else {
-      if (!contract) {
-        console.log("⚠️ Đang chờ contract khởi tạo...");
-      }
-      if (!tokenId) {
-        setError("Token ID không hợp lệ");
-        setLoading(false);
-      }
-    }
-  }, [contract, tokenId]);
-
-  const loadNFTDetails = async () => {
+  // ✅ HÀM loadNFTDetails CỦA BẠN ĐÃ ĐÚNG (Theo Lựa chọn A)
+  const loadNFTDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
+      console.log(
+        "📥 Bắt đầu tải NFT details TỪ BACKEND cho Token ID:",
+        tokenId
+      );
 
-      console.log("📥 Bắt đầu tải NFT details cho Token ID:", tokenId);
-
-      // Lấy thông tin owner
-      console.log("1️⃣ Đang lấy owner...");
-      const owner = await contract.ownerOf(tokenId);
-      console.log("✅ Owner:", owner);
-
-      // Lấy thông tin creator (tác giả)
-      console.log("2️⃣ Đang lấy creator...");
-      const creator = await contract.creatorOf(tokenId);
-      console.log("✅ Creator:", creator);
-
-      // Lấy thông tin NFT từ mapping nfts
-      console.log("3️⃣ Đang lấy NFT info...");
-      const nftInfo = await contract.nfts(tokenId);
-      console.log("✅ NFT Info:", nftInfo);
-
-      // Khởi tạo dữ liệu cơ bản
-      let metadata = {
-        name: `NFT #${tokenId}`,
-        description: "Không có mô tả",
-        image: "https://via.placeholder.com/500?text=NFT",
-      };
-
-      // Thử lấy metadata từ Pinata (nếu có)
-      try {
-        console.log("4️⃣ Đang lấy tokenURI...");
-        const tokenURI = await contract.tokenURI(tokenId);
-        console.log("✅ TokenURI:", tokenURI);
-
-        if (tokenURI && tokenURI !== "") {
-          console.log("5️⃣ Đang lấy metadata từ:", tokenURI);
-
-          // Chuyển đổi IPFS URL nếu cần
-          let fetchURL = tokenURI;
-          if (tokenURI.startsWith("ipfs://")) {
-            fetchURL = tokenURI.replace("ipfs://", "https://ipfs.io/ipfs/");
-            console.log("🔄 Converted IPFS URL to:", fetchURL);
-          }
-
-          const response = await fetch(fetchURL);
-          if (response.ok) {
-            const fetchedMetadata = await response.json();
-            console.log("✅ Metadata:", fetchedMetadata);
-
-            // Cập nhật metadata nếu fetch thành công
-            metadata = {
-              name: fetchedMetadata.name || metadata.name,
-              description: fetchedMetadata.description || metadata.description,
-              image: fetchedMetadata.image || metadata.image,
-            };
-
-            // Chuyển đổi IPFS image URL nếu cần
-            if (metadata.image.startsWith("ipfs://")) {
-              metadata.image = metadata.image.replace(
-                "ipfs://",
-                "https://ipfs.io/ipfs/"
-              );
-            }
-          } else {
-            console.warn(
-              `⚠️ HTTP ${response.status}: Không thể tải metadata, dùng giá trị mặc định`
-            );
-          }
-        }
-      } catch (metadataErr) {
-        console.warn("⚠️ Không thể tải metadata:", metadataErr.message);
-        console.log("ℹ️ Tiếp tục với thông tin cơ bản...");
+      // 1. GỌI API BACKEND (CHỈ 1 REQUEST)
+      const response = await fetch(
+        `http://localhost:5000/api/nft/detail/${tokenId}`
+      );
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || `Lỗi ${response.status}`);
       }
-
-      const data = {
-        tokenId: tokenId,
-        name: metadata.name,
-        description: metadata.description,
-        image: metadata.image,
-        owner: owner,
-        creator: creator,
-        isListed: nftInfo.listed,
-        price: nftInfo.price ? ethers.formatEther(nftInfo.price) : "0",
+      const data = await response.json();
+      // 2. CHUẨN HÓA DỮ LIỆU TỪ DB
+      const nft = data.item;
+      const formattedData = {
+        tokenId: nft.tokenId,
+        name: nft.name,
+        description: nft.description,
+        image: nft.imageUrl,
+        owner: nft.owner,
+        creator: nft.creator,
+        isListed: nft.isListed,
+        // Chuyển đổi Wei (String) sang ETH
+        price: ethers.formatEther(nft.listingPrice || "0"),
       };
 
-      console.log("✅ Tải NFT thành công:", data);
-      setNftData(data);
-      setLoading(false);
+      console.log("✅ Tải NFT thành công:", formattedData);
+      setNftData(formattedData);
     } catch (err) {
       console.error("❌ Lỗi khi tải NFT details:", err);
-      console.error("Chi tiết lỗi:", {
-        message: err.message,
-        code: err.code,
-        reason: err.reason,
-      });
-
-      let errorMessage = "Không thể tải thông tin NFT";
-      if (err.message.includes("nonexistent token")) {
-        errorMessage = `NFT với Token ID ${tokenId} không tồn tại`;
-      } else if (err.code === "CALL_EXCEPTION") {
-        errorMessage = "NFT không tồn tại hoặc contract chưa được deploy";
-      }
-
-      setError(`${errorMessage}: ${err.message}`);
+      setError(err.message);
+    } finally {
       setLoading(false);
     }
-  };
+  }, [tokenId]); // 👈 TỐI ƯU: Chỉ phụ thuộc vào tokenId
 
+  // ✅ SỬA LỖI: useEffect cần gọi loadNFTDetails
+  useEffect(() => {
+    // Chỉ tải khi có Token ID
+    if (tokenId) {
+      loadNFTDetails();
+    } else {
+      setError("Token ID không hợp lệ");
+      setLoading(false);
+    }
+  }, [loadNFTDetails, tokenId]); // Gọi lại khi tokenId hoặc hàm load thay đổi
+
+  // ✅ HÀM NIÊM YẾT (ĐÃ SỬA LỖI LOGIC - THÊM BƯỚC APPROVE)
   const handleListNFT = async () => {
     if (!listPrice || parseFloat(listPrice) <= 0) {
       alert("Vui lòng nhập giá hợp lệ!");
       return;
     }
-
-    if (!walletAddress) {
-      alert("Vui lòng kết nối ví!");
+    if (!contract || !signer) {
+      // Phải kiểm tra cả signer
+      alert("Vui lòng kết nối ví (Signer) để niêm yết!");
       return;
     }
 
     try {
       setIsListing(true);
       setError("");
-
-      // Chuyển đổi giá từ ETH sang Wei
       const priceInWei = ethers.parseEther(listPrice);
+      const contractAddress = await contract.getAddress(); // Lấy địa chỉ Contract Marketplace
 
-      // Gọi hàm listNFT từ smart contract
+      // --- BƯỚC 1: CẤP QUYỀN (APPROVE) ---
+      console.log("Bước 1/2: Đang yêu cầu cấp quyền (Approve)...");
+
+      // Kiểm tra xem đã approve cho toàn bộ (Approve All) chưa
+
+      const currentApproval = await contract.getApproved(tokenId);
+      if (currentApproval.toLowerCase() !== contractAddress.toLowerCase()) {
+        // Nếu chưa approve, gửi giao dịch approve
+        const approvalTx = await contract.approve(contractAddress, tokenId);
+        await approvalTx.wait(); // Đợi giao dịch approve hoàn tất
+        console.log("✅ Cấp quyền thành công!");
+      } else {
+        console.log("ℹ️ Đã cấp quyền (1-1) từ trước, bỏ qua bước 1.");
+      }
+
+      // --- BƯỚC 2: NIÊM YẾT (LIST NFT) ---
+      console.log("Bước 2/2: Đang gửi giao dịch Niêm yết (ListNFT)...");
       const tx = await contract.listNFT(tokenId, priceInWei);
-      await tx.wait();
+      await tx.wait(); // Đợi giao dịch niêm yết hoàn tất
 
-      alert("Niêm yết NFT thành công!");
+      alert("🎉 Niêm yết NFT thành công!");
 
-      // Tải lại thông tin NFT
-      await loadNFTDetails();
+      await loadNFTDetails(); // Tải lại thông tin để cập nhật (isListed: true)
       setListPrice("");
     } catch (err) {
-      console.error("Error listing NFT:", err);
+      console.error("❌ Lỗi khi niêm yết NFT:", err);
       setError("Không thể niêm yết NFT. Vui lòng thử lại!");
     } finally {
       setIsListing(false);
@@ -245,6 +178,7 @@ const NFTDetail = ({ walletAddress, signer }) => {
 
   const isOwner =
     walletAddress &&
+    nftData && // Thêm kiểm tra nftData
     walletAddress.toLowerCase() === nftData.owner.toLowerCase();
 
   return (

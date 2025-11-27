@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol"; // 👈 THAY ĐỔI: Thêm URI Storage
 import "@openzeppelin/contracts/access/Ownable.sol";
 
+
 // 👈 THAY ĐỔI: Kế thừa từ ERC721URIStorage
 contract NFTMarketPlace is ERC721URIStorage, Ownable {
     uint256 public nextTokenId;
@@ -45,7 +46,7 @@ contract NFTMarketPlace is ERC721URIStorage, Ownable {
     event FundsWithdrawn(address indexed user, uint256 amount);
 
     //THAY ĐỔI: Constructor gọi ERC721URIStorage
-    constructor() ERC721("MyNFT", "MNFT") Ownable(){}
+    constructor() ERC721("MyNFT", "MNFT") Ownable (msg.sender){}
 
     // =================== NFT MINT (ĐÃ SỬA: Thêm tokenURI) ===================
     function mintNFT(uint256 royaltyPercent, string memory _tokenURI) external {
@@ -76,7 +77,10 @@ contract NFTMarketPlace is ERC721URIStorage, Ownable {
 
         // Ghi chú: Frontend PHẢI gọi approve(address(this), tokenId) trước!
         
-        require(getApproved(tokenId) == address(this), "Marketplace not approved");
+        require(
+            getApproved(tokenId) == address(this) || isApprovedForAll(msg.sender, address(this)),
+            "Marketplace not approved"
+            );
         // Lưu thông tin NFT đang được bán
         nfts[tokenId] = NFT(tokenId, msg.sender, price, true);
         emit NFTListed(msg.sender, tokenId, price);
@@ -263,9 +267,7 @@ contract NFTMarketPlace is ERC721URIStorage, Ownable {
         require(mintedTokens[tokenId], "Token does not exist");
         return super.tokenURI(tokenId);
     }
-    function _burn(uint256 tokenId) internal override(ERC721URIStorage) {
-    super._burn(tokenId);
-    }
+    
     // Hàm getOwnedTokens thay cho totalSupply
     function getOwnedTokens(address owner) public view returns (uint256[] memory) {
     uint totalTokenCount = nextTokenId;

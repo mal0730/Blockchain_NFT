@@ -1,47 +1,37 @@
+// (File: backend/routes/nftRoutes.js)
 import express from "express";
 import upload from "../middlewares/uploadMiddleware.js";
-import { handleMint } from "../controllers/nftController.js";
-import fetch from "node-fetch";
+import { handleMint} from "../controllers/nftController.js"; // (Đổi tên/tách file)
+import { saveMintedNFT } from "../controllers/nftDatabaseController.js";
+import NFT from "../models/NFT.js"; 
 
 const router = express.Router();
 
-// Mint NFT: upload image + metadata
-router.post("/mint", upload.single("image"), handleMint);
+// --- ROUTE GHI (WRITE) ---
+// Frontend gọi để lấy tokenURI
+router.post("/mint", upload.single("image"), handleMint); 
 
-// Lấy NFT của user bằng Alchemy NFT REST API
-router.get("/my-nfts", async (req, res) => {
-  try {
-    const owner = req.query.owner;
-    if (!owner) return res.status(400).json({ error: "Missing owner address" });
+router.post("/save", saveMintedNFT); 
 
-    // REST endpoint chính xác
-    const url = `https://eth-sepolia.g.alchemy.com/nft/v2/${process.env.ALCHEMY_API_KEY}/getNFTs?owner=${owner}&withMetadata=true`;
+// --- ROUTE ĐỌC (READ) TỪ MONGODB ---
 
-    console.log("🔍 Calling Alchemy:", url);
+// Endpoint cho "My Collection"
+router.get('/collection/:address', async (req, res) => {
+    const nfts = await NFT.find({ owner: req.params.address.toLowerCase() });
+    res.json({ success: true, items: nfts });
+});
 
-    const response = await fetch(url);
-    if (!response.ok) {
-      const text = await response.text();
-      console.error("❌ Alchemy returned error:", text);
-      return res.status(500).json({ error: "Failed to fetch NFTs from Alchemy" });
-    }
+// Endpoint cho "Chợ" (Marketplace)
+router.get('/marketplace', async (req, res) => {
+    const nfts = await NFT.find({ $or: [{ isListed: true }, { isAuctionActive: true }] });
+    res.json({ success: true, items: nfts });
+});
 
-    const data = await response.json();
-
-    // map dữ liệu về dạng dễ dùng cho frontend
-    const nfts = (data.ownedNfts || []).map((nft) => ({
-      contractAddress: nft.contract.address,
-      tokenId: parseInt(nft.id.tokenId, 16), // hex → decimal
-      title: nft.title || "",
-      description: nft.description || "",
-      image: nft.media?.[0]?.gateway || "", // fallback nếu media trống
-    }));
-
-    res.json(nfts);
-  } catch (err) {
-    console.error("❌ Error fetching NFTs:", err);
-    res.status(500).json({ error: "Failed to fetch NFTs" });
-  }
+// Endpoint cho "NFT Detail" (Sửa lỗi 404/HTML)
+router.get('/detail/:tokenId', async (req, res) => {
+    const nft = await NFT.findOne({ tokenId: req.params.tokenId });
+    if (!nft) return res.status(404).json({ error: "Không tìm thấy NFT" });
+    res.json({ success: true, item: nft });
 });
 
 export default router;
