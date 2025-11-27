@@ -1,14 +1,18 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./MintNFT.css";
+import { useContract } from "../utils/useContract";
+import { ethers } from "ethers";
 
-const MintNFT = ({ walletAddress }) => {
+const MintNFT = ({ walletAddress, signer }) => {
+  const { contract } = useContract(signer);
   const navigate = useNavigate();
+  // thêm phí bản quyền 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    price: "0.5",
     image: null,
+    royaltyPercent: 5,
   });
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -43,41 +47,71 @@ const MintNFT = ({ walletAddress }) => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!walletAddress) {
-      alert("Please connect your wallet first!");
-      return;
-    }
+  if (!contract) {
+    alert("Smart contract not loaded yet.");
+    return;
+  }
 
-    if (!formData.image) {
-      alert("Please select an image!");
-      return;
-    }
+  if (!walletAddress) {
+    alert("Please connect your wallet first!");
+    return;
+  }
 
-    if (!formData.name.trim()) {
-      alert("Please enter NFT name!");
-      return;
-    }
+  if (!formData.image) {
+    alert("Please select an image!");
+    return;
+  }
 
-    setLoading(true);
+  if (!formData.name.trim()) {
+    alert("Please enter NFT name!");
+    return;
+  }
 
-    try {
-      // Xử lý mint NFT - sẽ được triển khai với smart contract
-      console.log("Minting NFT:", formData);
+  if(formData.royaltyPercent < 0 || formData.royaltyPercent > 100) {
+    alert("Royalty must be between 0 and 100 percent!");
+    return;
+  }
 
-      // Giả lập quá trình mint
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+  setLoading(true);
 
-      alert("NFT minted successfully!");
-      navigate("/collection");
-    } catch (error) {
-      console.error("Error minting NFT:", error);
-      alert("Error minting NFT. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    // 1️⃣ Upload image + metadata lên backend
+    const data = new FormData();
+    data.append("image", formData.image);
+    data.append("name", formData.name);
+    data.append("description", formData.description); 
+
+    const response = await fetch("http://localhost:5000/api/nft/mint", {
+      method: "POST",
+      body: data,
+    });
+
+    if (!response.ok) throw new Error("Failed to upload NFT metadata");
+
+    const { tokenURI } = await response.json();
+    console.log("✅ Received tokenURI from backend:", tokenURI);
+
+    // 2️⃣ Mint NFT lên blockchain
+
+    // Gọi smart contract
+    const royaltyValueForContract = ethers.toBigInt(Math.round(formData.royaltyPercent * 10));
+    const tx = await contract.mintNFT(royaltyValueForContract, tokenURI); // tên hàm phải đúng với contract
+    console.log("⏳ Transaction sent:", tx.hash);
+    await tx.wait();
+    console.log("✅ Transaction confirmed:", tx.hash);
+
+    alert("🎉 NFT minted successfully!");
+    navigate("/collection");
+  } catch (error) {
+    console.error("Error minting NFT:", error);
+    alert("Error minting NFT. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const handleCancel = () => {
     navigate("/");
@@ -158,14 +192,14 @@ const MintNFT = ({ walletAddress }) => {
 
             <div className="form-group">
               <label className="form-label">
-                Price (ETH) <span className="required">*</span>
+                Royalty Fee (%) <span className="required">*</span>
               </label>
               <input
                 type="number"
-                name="price"
-                value={formData.price}
+                name="royaltyPercent"
+                value={formData.royaltyPercent}
                 onChange={handleInputChange}
-                placeholder="0.5"
+                placeholder="5"
                 step="0.01"
                 min="0"
                 className="form-input"

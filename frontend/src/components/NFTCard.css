@@ -51,8 +51,8 @@
 
 .nft-footer {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid #e5e5e5;
@@ -75,20 +75,46 @@
   color: #000;
 }
 
-.btn-buy {
-  padding: 10px 20px;
-  background-color: #000;
+.nft-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-view-details {
+  flex: 1;
+  padding: 10px 16px;
+  background-color: #6c63ff;
   color: white;
   border: none;
   border-radius: 8px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
+}
+
+.btn-view-details:hover {
+  background-color: #5a52d5;
+  transform: translateY(-2px);
+}
+
+.btn-buy {
+  flex: 1;
+  padding: 10px 16px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .btn-buy:hover {
-  background-color: #333;
+  background-color: #45a049;
+  transform: translateY(-2px);
 }
 
 .btn-buy:disabled {
