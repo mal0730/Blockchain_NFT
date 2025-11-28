@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ethers } from "ethers";
 import "./Activity.css";
 
 const Activity = () => {
+  const navigate = useNavigate();
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all"); // all, mint, list, buy, transfer
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState("item"); // item, from, to, time
 
   useEffect(() => {
     loadActivities();
@@ -63,17 +67,14 @@ const Activity = () => {
   };
 
   const formatTime = (date) => {
-    const now = new Date();
-    const diff = now - date;
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    const seconds = date.getSeconds().toString().padStart(2, "0");
 
-    if (days > 0) return `${days} ngày trước`;
-    if (hours > 0) return `${hours} giờ trước`;
-    if (minutes > 0) return `${minutes} phút trước`;
-    return `${seconds} giây trước`;
+    return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
   };
 
   const getEventIcon = (event) => {
@@ -106,9 +107,41 @@ const Activity = () => {
     }
   };
 
+  const handleItemClick = (tokenId) => {
+    navigate(`/nft/${tokenId}`);
+  };
+
   const filteredActivities = activities.filter((activity) => {
-    if (filter === "all") return true;
-    return activity.event.toLowerCase() === filter;
+    // Lọc theo event type
+    if (filter !== "all" && activity.event.toLowerCase() !== filter) {
+      return false;
+    }
+
+    // Lọc theo tìm kiếm
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+
+      if (searchType === "item") {
+        // Tìm theo tokenId
+        return activity.tokenId.toString().includes(query);
+      } else if (searchType === "from") {
+        // Tìm theo địa chỉ From
+        return activity.from.toLowerCase().includes(query);
+      } else if (searchType === "to") {
+        // Tìm theo địa chỉ To
+        return activity.to.toLowerCase().includes(query);
+      } else if (searchType === "time") {
+        // Tìm theo ngày (input date sẽ cho format YYYY-MM-DD)
+        if (searchQuery) {
+          const [year, month, day] = searchQuery.split("-");
+          const searchDate = `${day}/${month}/${year}`;
+          const activityDate = formatTime(activity.time).split(" ")[0]; // Lấy phần ngày DD/MM/YYYY
+          return activityDate === searchDate;
+        }
+      }
+    }
+
+    return true;
   });
 
   return (
@@ -153,6 +186,38 @@ const Activity = () => {
         </button>
       </div>
 
+      <div className="search-container">
+        <select
+          className="search-type-select"
+          value={searchType}
+          onChange={(e) => {
+            setSearchType(e.target.value);
+            setSearchQuery(""); // Reset search query khi đổi loại
+          }}
+        >
+          <option value="item">Item</option>
+          <option value="from">From</option>
+          <option value="to">To</option>
+          <option value="time">Time</option>
+        </select>
+        <input
+          type={searchType === "time" ? "date" : "text"}
+          className="search-input"
+          placeholder={
+            searchType === "item"
+              ? "Tìm kiếm theo Item (Token ID)..."
+              : searchType === "from"
+              ? "Tìm kiếm theo địa chỉ From..."
+              : searchType === "to"
+              ? "Tìm kiếm theo địa chỉ To..."
+              : "Chọn ngày..."
+          }
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        <span className="search-icon">🔍</span>
+      </div>
+
       {loading ? (
         <div className="loading-container">
           <div className="spinner"></div>
@@ -188,7 +253,10 @@ const Activity = () => {
                       <span className="event-text">{activity.event}</span>
                     </div>
                   </td>
-                  <td>
+                  <td
+                    onClick={() => handleItemClick(activity.tokenId)}
+                    style={{ cursor: "pointer" }}
+                  >
                     <div className="item-info">
                       <span className="item-name">NFT #{activity.tokenId}</span>
                     </div>

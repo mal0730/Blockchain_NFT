@@ -10,8 +10,10 @@ const Home = ({ walletAddress, signer }) => {
   const { contract } = useContract(signer);
 
   const [nfts, setNfts] = useState([]);
+  const [allNfts, setAllNfts] = useState([]); // Lưu toàn bộ NFTs
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // --- HÀM TẢI DỮ LIỆU CHỢ (ĐỌC TỪ MONGODB API) ---
   const loadNFTs = useCallback(async () => {
@@ -38,9 +40,12 @@ const Home = ({ walletAddress, signer }) => {
         price: ethers.formatEther(nft.listingPrice || "0"), // Chuyển đổi Wei (string) sang ETH
         seller: nft.listingSeller,
         isListed: nft.isListed,
+        owner: nft.owner, // Thêm owner để tìm kiếm
+        creator: nft.creator, // Thêm creator để tìm kiếm
       }));
 
-      setNfts(processedNFTs);
+      setAllNfts(processedNFTs); // Lưu toàn bộ
+      setNfts(processedNFTs); // Hiển thị ban đầu
       setStatusMessage(`Tìm thấy ${processedNFTs.length} NFT đang niêm yết.`);
     } catch (error) {
       console.error("❌ Error loading Marketplace NFTs:", error);
@@ -95,6 +100,28 @@ const Home = ({ walletAddress, signer }) => {
     }
   }, [contract, loadNFTs]); // Phụ thuộc vào contract và loadNFTs
 
+  // --- HÀM TÌM KIẾM ---
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+
+    if (!query.trim()) {
+      setNfts(allNfts); // Hiển thị tất cả khi không có từ khóa
+      return;
+    }
+
+    const searchLower = query.toLowerCase();
+    const filtered = allNfts.filter((nft) => {
+      // Tìm theo tên NFT
+      const matchName = nft.name?.toLowerCase().includes(searchLower);
+      // Tìm theo tokenId
+      const matchTokenId = nft.tokenId?.toString().includes(query);
+
+      return matchName || matchTokenId;
+    });
+
+    setNfts(filtered);
+  };
+
   // --- RENDER (GIỮ NGUYÊN CẤU TRÚC CŨ) ---
   return (
     <div className="home">
@@ -109,6 +136,17 @@ const Home = ({ walletAddress, signer }) => {
         <div className="section-header">
           <h2>Available NFTs</h2>
           {statusMessage && <p className="status-message">{statusMessage}</p>}
+        </div>
+
+        <div className="search-bar">
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Tìm NFT theo tên, địa chỉ, hoặc ID..."
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+          <span className="search-icon">🔍</span>
         </div>
 
         {loading ? (

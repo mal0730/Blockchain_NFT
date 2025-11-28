@@ -91,3 +91,17 @@
   font-family: monospace;
   color: #666;
 }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .wallet-info {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .wallet-balance,
+  .wallet-address {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}

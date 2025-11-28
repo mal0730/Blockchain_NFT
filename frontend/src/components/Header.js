@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ethers } from "ethers";
 import "./Header.css";
 
 const Header = ({ walletAddress, connectWallet, provider }) => {
-  const navigate = useNavigate();
   const [balance, setBalance] = useState("0");
 
   const formatAddress = (address) => {
