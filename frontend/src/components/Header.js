@@ -1,14 +1,39 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ethers } from "ethers";
 import "./Header.css";
 
-const Header = ({ walletAddress, connectWallet }) => {
+const Header = ({ walletAddress, connectWallet, provider }) => {
   const navigate = useNavigate();
+  const [balance, setBalance] = useState("0");
 
   const formatAddress = (address) => {
     if (!address) return "";
     return `${address.substring(0, 6)}...${address.substring(38)}`;
   };
+
+  const formatBalance = (balance) => {
+    return parseFloat(balance).toFixed(4);
+  };
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (walletAddress && provider) {
+        try {
+          const balanceWei = await provider.getBalance(walletAddress);
+          const balanceEth = ethers.formatEther(balanceWei);
+          setBalance(balanceEth);
+        } catch (error) {
+          console.error("Error fetching balance:", error);
+          setBalance("0");
+        }
+      } else {
+        setBalance("0");
+      }
+    };
+
+    fetchBalance();
+  }, [walletAddress, provider]);
 
   return (
     <header className="header">
@@ -21,20 +46,13 @@ const Header = ({ walletAddress, connectWallet }) => {
         <nav className="nav-buttons">
           {walletAddress ? (
             <>
-              <button
-                className="btn btn-primary"
-                onClick={() => navigate("/mint")}
-              >
-                Mint NFT
-              </button>
-              <button
-                className="btn btn-secondary"
-                onClick={() => navigate("/collection")}
-              >
-                My Collection
-              </button>
-              <div className="wallet-address">
-                {formatAddress(walletAddress)}
+              <div className="wallet-info">
+                <div className="wallet-balance">
+                  {formatBalance(balance)} ETH
+                </div>
+                <div className="wallet-address">
+                  {formatAddress(walletAddress)}
+                </div>
               </div>
             </>
           ) : (
