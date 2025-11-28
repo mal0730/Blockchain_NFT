@@ -121,10 +121,7 @@ function App() {
                 />
               }
             />
-            <Route
-              path="/activity"
-              element={<Activity provider={provider} />}
-            />
+            <Route path="/activity" element={<Activity />} />
             <Route
               path="/withdraw"
               element={

@@ -1,109 +1,54 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { useContract } from "../utils/useContract";
 import "./Activity.css";
 
-const Activity = ({ provider }) => {
+const Activity = () => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all"); // all, mint, list, sale, transfer
-  const contract = useContract();
+  const [filter, setFilter] = useState("all"); // all, mint, list, buy, transfer
 
   useEffect(() => {
     loadActivities();
-  }, [contract, provider]);
+  }, []);
 
   const loadActivities = async () => {
-    if (!contract || !provider) {
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
-      const allActivities = [];
+      console.log("Fetching activities from backend...");
+      const response = await fetch("http://localhost:5000/api/nft/activities");
+      console.log("Response status:", response.status);
 
-      // Lấy events từ contract
-      // NFTMinted event
-      const mintFilter = contract.filters.NFTMinted();
-      const mintEvents = await contract.queryFilter(mintFilter);
+      const data = await response.json();
+      console.log("Response data:", data);
 
-      for (const event of mintEvents) {
-        const block = await provider.getBlock(event.blockNumber);
-        allActivities.push({
-          event: "Mint",
-          tokenId: event.args.tokenId.toString(),
-          price: "0",
-          from: "0x0000000000000000000000000000000000000000",
-          to: event.args.owner,
-          time: new Date(block.timestamp * 1000),
-          txHash: event.transactionHash,
-          blockNumber: event.blockNumber,
+      if (data.success) {
+        console.log("Number of activities:", data.activities.length);
+        // Chuyển đổi dữ liệu từ MongoDB sang format hiển thị
+        const formattedActivities = data.activities.map((activity) => {
+          // Chuyển đổi price từ Wei sang ETH nếu có
+          let priceInEth = "0";
+          if (activity.price && activity.price !== "0") {
+            try {
+              priceInEth = ethers.formatEther(activity.price);
+            } catch (e) {
+              priceInEth = "0";
+            }
+          }
+
+          return {
+            event: activity.eventType, // Mint, List, Buy, Transfer...
+            tokenId: activity.tokenId,
+            price: priceInEth,
+            from: activity.from || "0x0000000000000000000000000000000000000000",
+            to: activity.to || "Market",
+            time: new Date(activity.createdAt),
+            txHash: activity.txHash,
+          };
         });
+
+        console.log("Formatted activities:", formattedActivities);
+        setActivities(formattedActivities);
       }
-
-      // NFTListed event
-      const listFilter = contract.filters.NFTListed();
-      const listEvents = await contract.queryFilter(listFilter);
-
-      for (const event of listEvents) {
-        const block = await provider.getBlock(event.blockNumber);
-        allActivities.push({
-          event: "List",
-          tokenId: event.args.tokenId.toString(),
-          price: ethers.formatEther(event.args.price),
-          from: event.args.seller,
-          to: "Market",
-          time: new Date(block.timestamp * 1000),
-          txHash: event.transactionHash,
-          blockNumber: event.blockNumber,
-        });
-      }
-
-      // NFTSold event
-      const saleFilter = contract.filters.NFTSold();
-      const saleEvents = await contract.queryFilter(saleFilter);
-
-      for (const event of saleEvents) {
-        const block = await provider.getBlock(event.blockNumber);
-        allActivities.push({
-          event: "Sale",
-          tokenId: event.args.tokenId.toString(),
-          price: ethers.formatEther(event.args.price),
-          from: event.args.seller,
-          to: event.args.buyer,
-          time: new Date(block.timestamp * 1000),
-          txHash: event.transactionHash,
-          blockNumber: event.blockNumber,
-        });
-      }
-
-      // Transfer event (ERC721)
-      const transferFilter = contract.filters.Transfer();
-      const transferEvents = await contract.queryFilter(transferFilter);
-
-      for (const event of transferEvents) {
-        // Bỏ qua transfer từ mint (from = 0x0)
-        if (event.args.from === "0x0000000000000000000000000000000000000000") {
-          continue;
-        }
-
-        const block = await provider.getBlock(event.blockNumber);
-        allActivities.push({
-          event: "Transfer",
-          tokenId: event.args.tokenId.toString(),
-          price: "0",
-          from: event.args.from,
-          to: event.args.to,
-          time: new Date(block.timestamp * 1000),
-          txHash: event.transactionHash,
-          blockNumber: event.blockNumber,
-        });
-      }
-
-      // Sắp xếp theo thời gian (mới nhất trước)
-      allActivities.sort((a, b) => b.time - a.time);
-      setActivities(allActivities);
     } catch (error) {
       console.error("Error loading activities:", error);
     } finally {
@@ -137,7 +82,7 @@ const Activity = ({ provider }) => {
         return "✨";
       case "List":
         return "📋";
-      case "Sale":
+      case "Buy":
         return "💰";
       case "Transfer":
         return "🔄";
@@ -152,7 +97,7 @@ const Activity = ({ provider }) => {
         return "mint";
       case "List":
         return "list";
-      case "Sale":
+      case "Buy":
         return "sale";
       case "Transfer":
         return "transfer";
@@ -165,17 +110,6 @@ const Activity = ({ provider }) => {
     if (filter === "all") return true;
     return activity.event.toLowerCase() === filter;
   });
-
-  if (!provider) {
-    return (
-      <div className="activity-page">
-        <div className="connect-message">
-          <h2>⚠️ Chưa kết nối ví</h2>
-          <p>Vui lòng kết nối MetaMask để xem hoạt động</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="activity-page">
@@ -206,10 +140,10 @@ const Activity = ({ provider }) => {
           List
         </button>
         <button
-          className={filter === "sale" ? "tab active" : "tab"}
-          onClick={() => setFilter("sale")}
+          className={filter === "buy" ? "tab active" : "tab"}
+          onClick={() => setFilter("buy")}
         >
-          Sale
+          Buy
         </button>
         <button
           className={filter === "transfer" ? "tab active" : "tab"}
