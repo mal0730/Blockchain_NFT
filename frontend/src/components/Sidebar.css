@@ -92,3 +92,29 @@
     font-size: 24px;
   }
 }
+
+/* ===========================
+   Disable specific sidebar items while processing
+   (only the requested items)
+   =========================== */
+
+.app-processing .nav-item.nav-discover,
+.app-processing .nav-item.nav-collection,
+.app-processing .nav-item.nav-mint,
+.app-processing .nav-item.nav-activity,
+.app-processing .nav-item.nav-withdraw {
+  pointer-events: none;
+  cursor: not-allowed;
+  opacity: 0.6;
+  user-select: none;
+}
+
+/* prevent hover styles while disabled */
+.app-processing .nav-item.nav-discover:hover,
+.app-processing .nav-item.nav-collection:hover,
+.app-processing .nav-item.nav-mint:hover,
+.app-processing .nav-item.nav-activity:hover,
+.app-processing .nav-item.nav-withdraw:hover {
+  background-color: transparent !important;
+  color: inherit !important;
+}

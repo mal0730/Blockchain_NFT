@@ -19,6 +19,21 @@ const NFTDetail = ({ walletAddress, signer }) => {
   const [listPrice, setListPrice] = useState("");
   const [isListing, setIsListing] = useState(false);
 
+  // ✅ NEW: buy processing flag to prevent double clicks
+  const [isBuying, setIsBuying] = useState(false);
+
+  // ✅ NEW: toggle global class to disable sidebar / change cursor while buying
+  useEffect(() => {
+    if (isBuying) {
+      document.body.classList.add("app-processing");
+    } else {
+      document.body.classList.remove("app-processing");
+    }
+    return () => {
+      document.body.classList.remove("app-processing");
+    };
+  }, [isBuying]);
+  
   // ✅ HÀM loadNFTDetails CỦA BẠN ĐÃ ĐÚNG (Theo Lựa chọn A)
   const loadNFTDetails = useCallback(async () => {
     try {
@@ -123,6 +138,75 @@ const NFTDetail = ({ walletAddress, signer }) => {
     }
   };
 
+  // --- NEW: Buy logic similar to Home.handleBuyNFT (prevents double click, checks on-chain) ---
+  const handleBuyNFT = async () => {
+    if (isBuying) return;
+    if (!walletAddress || !contract || !signer) {
+      alert("Vui lòng kết nối ví và đợi hợp đồng tải.");
+      return;
+    }
+
+    try {
+      setIsBuying(true);
+      setError("");
+      // re-read on-chain listing to ensure up-to-date
+      const onchain = await contract.nfts(tokenId);
+      if (!onchain.listed) {
+        alert("NFT này không còn được niêm yết!");
+        await loadNFTDetails();
+        return;
+      }
+      if (onchain.price <= 0n) {
+        alert("NFT không hợp lệ hoặc giá bằng 0.");
+        return;
+      }
+
+      const priceInWei = onchain.price;
+      const balance = await signer.provider.getBalance(walletAddress);
+      if (balance < priceInWei) {
+        const balanceInEth = ethers.formatEther(balance);
+        const priceInEth = ethers.formatEther(priceInWei);
+        alert(`Số dư ví không đủ.\nCần: ${priceInEth} ETH\nCó: ${balanceInEth} ETH`);
+        return;
+      }
+
+      // send transaction
+      const tx = await contract.buyNFT(tokenId, {
+        value: priceInWei,
+        gasLimit: 300000,
+      });
+
+      setError("Đang chờ blockchain xác nhận...");
+      const receipt = await tx.wait();
+      alert(`🎉 Mua ${nftData?.name || tokenId} thành công!\nHash: ${receipt.transactionHash}`);
+
+      // reload details and marketplace state
+      await loadNFTDetails();
+    } catch (err) {
+      console.error("❌ Error buying NFT:", err);
+
+      if (err.code === "ACTION_REJECTED") {
+        setError("Bạn đã hủy giao dịch trong MetaMask.");
+        return;
+      }
+      if (err.code === "CALL_EXCEPTION") {
+        const reason = err.reason || err.message;
+        if (reason.includes("Not listed")) {
+          setError("NFT đã không còn được niêm yết.");
+          await loadNFTDetails();
+          return;
+        }
+      }
+      if (err.message && err.message.includes("insufficient funds")) {
+        setError("Số dư ví không đủ (kể cả gas).");
+        return;
+      }
+      setError(err.message || "Giao dịch thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsBuying(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="nft-detail-container">
@@ -183,7 +267,12 @@ const NFTDetail = ({ walletAddress, signer }) => {
 
   return (
     <div className="nft-detail-container">
-      <button onClick={() => navigate(-1)} className="btn-back">
+      <button
+        onClick={() => !isBuying && navigate(-1)}
+        className="btn-back"
+        disabled={isBuying}
+        title={isBuying ? "Không thể quay lại khi giao dịch đang xử lý" : "Quay lại"}
+      >
         ← Quay lại
       </button>
 
@@ -280,6 +369,27 @@ const NFTDetail = ({ walletAddress, signer }) => {
           {!isOwner && (
             <div className="not-owner-info">
               <p>Bạn không phải là chủ sở hữu của NFT này</p>
+            </div>
+          )}
+        {/* Nếu không phải owner: show Buy button when listed, with same logic as Home */}
+          {!isOwner && nftData.isListed && (
+            <div className="buy-section">
+              <button
+                onClick={handleBuyNFT}
+                disabled={isBuying}
+                className="btn-buy"
+                title={isBuying ? "Đang xử lý giao dịch..." : "Buy NFT"}
+              >
+                {isBuying ? "⏳ Đang mua..." : `Buy for ${nftData.price} ETH`}
+              </button>
+              {error && <p className="error-message">{error}</p>}
+            </div>
+          )}
+
+          {/* Nếu không phải owner và chưa niêm yết */}
+          {!isOwner && !nftData.isListed && (
+            <div className="not-owner-info">
+              <p>NFT hiện không có để mua</p>
             </div>
           )}
         </div>
