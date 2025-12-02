@@ -34,7 +34,7 @@ const Home = ({ walletAddress, signer }) => {
   // --- HÀM TẢI DỮ LIỆU CHỢ (ĐỌC TỪ MONGODB API) ---
   const loadNFTs = useCallback(async () => {
     setLoading(true);
-    setStatusMessage("Đang tải Marketplace...");
+    setStatusMessage("Loading Marketplace...");
     try {
       // 1. GỌI API BACKEND: Đọc từ route /api/nft/marketplace
       const url = `http://localhost:5000/api/nft/marketplace`;
@@ -62,10 +62,10 @@ const Home = ({ walletAddress, signer }) => {
 
       setAllNfts(processedNFTs); // Lưu toàn bộ
       setNfts(processedNFTs); // Hiển thị ban đầu
-      setStatusMessage(`Tìm thấy ${processedNFTs.length} NFT đang niêm yết.`);
+      setStatusMessage(`Found ${processedNFTs.length} Listed NFTs.`);
     } catch (error) {
       console.error("❌ Error loading Marketplace NFTs:", error);
-      setStatusMessage("Lỗi tải chợ. Vui lòng kiểm tra console.");
+      setStatusMessage("Error loading marketplace. Please check console.");
       setNfts([]);
     } finally {
       setLoading(false);
@@ -75,35 +75,35 @@ const Home = ({ walletAddress, signer }) => {
   // --- HÀM MUA NFT (WRITE TRANSACTION) ---
   const handleBuyNFT = async (nft) => {
     if (isProcessing) {
-      alert("⏳ Đang xử lý giao dịch. Vui lòng chờ...");
+      alert("⏳ Processing transaction. Please wait...");
       return;
     }
 
     if (!walletAddress || !contract) {
-      alert("Vui lòng kết nối ví và đợi hợp đồng tải.");
+      alert("Please connect wallet and wait for the contract to load.");
       return;
     }
 
     // Kiểm tra xem người mua có phải là người bán không (Sử dụng dữ liệu từ API)
     if (walletAddress.toLowerCase() === nft.seller.toLowerCase()) {
-      alert("Bạn không thể mua NFT của chính mình!");
+      alert("You cannot buy your own NFT!");
       return;
     }
 
     try {
       setIsProcessing(true);
       setProcessingTokenId(nft.tokenId);
-      setStatusMessage("Đang kiểm tra trạng thái NFT...");
+      setStatusMessage("Checking NFT status...");
       
       // 👉 Đọc dữ liệu trực tiếp từ on-chain
       const nftOnchain = await contract.nfts(nft.tokenId);
 
       if (!nftOnchain.listed) {
-        alert("NFT này không còn được niêm yết!");
+        alert("NFT is no longer listed!");
         return;
       }
       if (nftOnchain.price <= 0n) {
-        alert("NFT không hợp lệ hoặc giá bằng 0.");
+        alert("Invalid NFT or price is zero.");
         return;
       }
 
@@ -114,14 +114,14 @@ const Home = ({ walletAddress, signer }) => {
         const balanceInEth = ethers.formatEther(balance);
         const priceInEth = ethers.formatEther(priceInWei);
         alert(
-          `Số dư ví không đủ.\n` +
-          `Cần: ${priceInEth} ETH\n` +
-          `Có: ${balanceInEth} ETH`
+          `Insufficient wallet balance.\n` +
+          `Required: ${priceInEth} ETH\n` +
+          `Available: ${balanceInEth} ETH`
         );
         return;
       }
 
-      setStatusMessage("Đang gửi giao dịch mua...");
+      setStatusMessage("Sending purchase transaction...");
 
       // 4. Gọi hàm buyNFT trên Smart Contract và gửi ETH bằng giá niêm yết
       const tx = await contract.buyNFT(nft.tokenId, {
@@ -130,16 +130,16 @@ const Home = ({ walletAddress, signer }) => {
       });
 
       console.log("⏳ Transaction sent:", tx.hash);
-      setStatusMessage("Đang chờ blockchain xác nhận...");
+      setStatusMessage("Waiting for blockchain confirmation...");
       const receipt = await tx.wait();
       console.log("✅ Transaction confirmed:", receipt.transactionHash);
 
-      alert(`🎉 Mua ${nft.name} thành công!\nHash: ${receipt.transactionHash}`);
+      alert(`🎉 NFT purchased successfully!\nHash: ${receipt.transactionHash}`);
 
       // Tải lại danh sách sau khi mua thành công
       setTimeout(() => {
         loadNFTs();
-        setStatusMessage("✅ Giao dịch hoàn tất!");
+        setStatusMessage("✅ Transaction completed!");
         setTimeout(() => setStatusMessage(""), 3000);
       }, 1000);
 
@@ -147,12 +147,12 @@ const Home = ({ walletAddress, signer }) => {
       console.error("❌ Error buying NFT:", error);
 
       if (error.code === "ACTION_REJECTED") {
-        setStatusMessage("❌ Bạn đã hủy giao dịch trong MetaMask.");
+        setStatusMessage("❌ You canceled the transaction in MetaMask.");
         return;
       }
 
       if (error.code === "NETWORK_ERROR") {
-        setStatusMessage("❌ Lỗi kết nối mạng. Kiểm tra RPC URL.");
+        setStatusMessage("❌ Network connection error. Check RPC URL.");
         return;
       }
 
@@ -160,36 +160,36 @@ const Home = ({ walletAddress, signer }) => {
         // Lỗi từ smart contract (revert)
         const reason = error.reason || error.message;
         if (reason.includes("Not listed")) {
-          setStatusMessage("❌ NFT đã không còn được niêm yết.");
+          setStatusMessage("❌ NFT is no longer listed.");
           loadNFTs();
         } else if (reason.includes("Insufficient payment")) {
-          setStatusMessage("❌ Số tiền gửi không đủ.");
+          setStatusMessage("❌ Insufficient payment sent.");
         } else if (reason.includes("not approved")) {
-          setStatusMessage("❌ Marketplace không được phép chuyển NFT này.");
+          setStatusMessage("❌ Marketplace is not approved to transfer this NFT.");
         } else {
-          setStatusMessage(`❌ Smart Contract lỗi: ${reason}`);
+          setStatusMessage(`❌ Smart Contract error: ${reason}`);
         }
         return;
       }
 
       if (error.message.includes("insufficient funds")) {
-        setStatusMessage("❌ Số dư ví không đủ (kể cả gas fee).");
+        setStatusMessage("❌ Insufficient wallet balance (including gas fee).");
         return;
       }
 
       if (error.message.includes("out of gas")) {
-        setStatusMessage("❌ Gas limit không đủ. Tăng gasLimit.");
+        setStatusMessage("❌ Insufficient gas limit. Increase gasLimit.");
         return;
       }
 
       if (error.message.includes("nonce")) {
-        setStatusMessage("❌ Lỗi nonce. Thử lại sau.");
+        setStatusMessage("❌ Nonce error. Please try again later.");
         return;
       }
 
       // Fallback error
       setStatusMessage(
-        `❌ Giao dịch thất bại.\nLỗi: ${error.message || error.toString()}`
+        `❌ Transaction failed.\nError: ${error.message || error.toString()}`
       );
     } finally {
       // ✅ SỬA 4: Luôn xóa flag xử lý (dù thành công hay lỗi)
@@ -248,7 +248,7 @@ const Home = ({ walletAddress, signer }) => {
           <input
             type="text"
             className="search-input"
-            placeholder="Tìm NFT theo tên, địa chỉ, hoặc ID..."
+            placeholder="Search NFT by name, address, or ID..."
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
             // ✅ Vô hiệu hóa search khi đang xử lý

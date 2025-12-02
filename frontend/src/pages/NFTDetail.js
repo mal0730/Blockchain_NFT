@@ -83,7 +83,7 @@ const NFTDetail = ({ walletAddress, signer }) => {
     if (tokenId) {
       loadNFTDetails();
     } else {
-      setError("Token ID không hợp lệ");
+      setError("Invalid Token ID");
       setLoading(false);
     }
   }, [loadNFTDetails, tokenId]); // Gọi lại khi tokenId hoặc hàm load thay đổi
@@ -91,12 +91,12 @@ const NFTDetail = ({ walletAddress, signer }) => {
   // ✅ HÀM NIÊM YẾT (ĐÃ SỬA LỖI LOGIC - THÊM BƯỚC APPROVE)
   const handleListNFT = async () => {
     if (!listPrice || parseFloat(listPrice) <= 0) {
-      alert("Vui lòng nhập giá hợp lệ!");
+      alert("Please enter a valid price!");
       return;
     }
     if (!contract || !signer) {
       // Phải kiểm tra cả signer
-      alert("Vui lòng kết nối ví (Signer) để niêm yết!");
+      alert("Please connect wallet (Signer) to list!");
       return;
     }
 
@@ -126,13 +126,13 @@ const NFTDetail = ({ walletAddress, signer }) => {
       const tx = await contract.listNFT(tokenId, priceInWei);
       await tx.wait(); // Đợi giao dịch niêm yết hoàn tất
 
-      alert("🎉 Niêm yết NFT thành công!");
+      alert("🎉 NFT Listed successfully!");
 
       await loadNFTDetails(); // Tải lại thông tin để cập nhật (isListed: true)
       setListPrice("");
     } catch (err) {
-      console.error("❌ Lỗi khi niêm yết NFT:", err);
-      setError("Không thể niêm yết NFT. Vui lòng thử lại!");
+      console.error("❌ Error listing NFT:", err);
+      setError("Failed to list NFT. Please try again!");
     } finally {
       setIsListing(false);
     }
@@ -142,7 +142,7 @@ const NFTDetail = ({ walletAddress, signer }) => {
   const handleBuyNFT = async () => {
     if (isBuying) return;
     if (!walletAddress || !contract || !signer) {
-      alert("Vui lòng kết nối ví và đợi hợp đồng tải.");
+      alert("Please connect wallet and wait for contract to load.");
       return;
     }
 
@@ -152,12 +152,12 @@ const NFTDetail = ({ walletAddress, signer }) => {
       // re-read on-chain listing to ensure up-to-date
       const onchain = await contract.nfts(tokenId);
       if (!onchain.listed) {
-        alert("NFT này không còn được niêm yết!");
+        alert("NFT is no longer listed!");
         await loadNFTDetails();
         return;
       }
       if (onchain.price <= 0n) {
-        alert("NFT không hợp lệ hoặc giá bằng 0.");
+        alert("Invalid NFT or price is zero.");
         return;
       }
 
@@ -166,7 +166,7 @@ const NFTDetail = ({ walletAddress, signer }) => {
       if (balance < priceInWei) {
         const balanceInEth = ethers.formatEther(balance);
         const priceInEth = ethers.formatEther(priceInWei);
-        alert(`Số dư ví không đủ.\nCần: ${priceInEth} ETH\nCó: ${balanceInEth} ETH`);
+        alert(`Insufficient balance!\nRequired: ${priceInEth} ETH\nAvailable: ${balanceInEth} ETH`);
         return;
       }
 
@@ -176,9 +176,9 @@ const NFTDetail = ({ walletAddress, signer }) => {
         gasLimit: 300000,
       });
 
-      setError("Đang chờ blockchain xác nhận...");
+      setError("Waiting for blockchain confirmation...");
       const receipt = await tx.wait();
-      alert(`🎉 Mua ${nftData?.name || tokenId} thành công!\nHash: ${receipt.transactionHash}`);
+      alert(`🎉 Purchase of ${nftData?.name || tokenId} successful!\nHash: ${receipt.transactionHash}`);
 
       // reload details and marketplace state
       await loadNFTDetails();
@@ -186,13 +186,13 @@ const NFTDetail = ({ walletAddress, signer }) => {
       console.error("❌ Error buying NFT:", err);
 
       if (err.code === "ACTION_REJECTED") {
-        setError("Bạn đã hủy giao dịch trong MetaMask.");
+        setError("You rejected the transaction in MetaMask.");
         return;
       }
       if (err.code === "CALL_EXCEPTION") {
         const reason = err.reason || err.message;
         if (reason.includes("Not listed")) {
-          setError("NFT đã không còn được niêm yết.");
+          setError("NFT is no longer listed.");
           await loadNFTDetails();
           return;
         }
@@ -225,30 +225,30 @@ const NFTDetail = ({ walletAddress, signer }) => {
           <h2>⚠️ Lỗi</h2>
           <div className="error-message">{error}</div>
           <details className="error-details">
-            <summary>Chi tiết kỹ thuật</summary>
+            <summary>Technical Details</summary>
             <p>
               <strong>Token ID:</strong> {tokenId}
             </p>
             <p>
               <strong>Contract:</strong>{" "}
-              {contract ? "✅ Đã kết nối" : "❌ Chưa kết nối"}
+              {contract ? "✅ Connected" : "❌ Not Connected"}
             </p>
             <p>
-              <strong>Wallet:</strong> {walletAddress || "Chưa kết nối"}
+              <strong>Wallet:</strong> {walletAddress || "Not Connected"}
             </p>
             <p>
-              <strong>Signer:</strong> {signer ? "✅ Có" : "❌ Không có"}
+              <strong>Signer:</strong> {signer ? "✅ Yes" : "❌ No"}
             </p>
           </details>
           <div className="error-actions">
             <button onClick={() => navigate(-1)} className="btn-back">
-              ← Quay lại
+              ← Back
             </button>
             <button
               onClick={() => window.location.reload()}
               className="btn-retry"
             >
-              🔄 Thử lại
+              🔄 Retry
             </button>
           </div>
         </div>
@@ -271,9 +271,9 @@ const NFTDetail = ({ walletAddress, signer }) => {
         onClick={() => !isBuying && navigate(-1)}
         className="btn-back"
         disabled={isBuying}
-        title={isBuying ? "Không thể quay lại khi giao dịch đang xử lý" : "Quay lại"}
+        title={isBuying ? "Cannot go back while transaction is processing" : "Go back"}
       >
-        ← Quay lại
+        ← Back
       </button>
 
       <div className="nft-detail-content">
@@ -295,7 +295,7 @@ const NFTDetail = ({ walletAddress, signer }) => {
             </div>
 
             <div className="nft-info-item">
-              <span className="info-label">Tác giả:</span>
+              <span className="info-label">Creator:</span>
               <span className="info-value address">
                 {nftData.creator.substring(0, 6)}...
                 {nftData.creator.substring(nftData.creator.length - 4)}
@@ -303,7 +303,7 @@ const NFTDetail = ({ walletAddress, signer }) => {
             </div>
 
             <div className="nft-info-item">
-              <span className="info-label">Người sở hữu:</span>
+              <span className="info-label">Current Owner:</span>
               <span className="info-value address">
                 {nftData.owner.substring(0, 6)}...
                 {nftData.owner.substring(nftData.owner.length - 4)}
@@ -312,36 +312,36 @@ const NFTDetail = ({ walletAddress, signer }) => {
 
             {nftData.isListed && (
               <div className="nft-info-item">
-                <span className="info-label">Giá niêm yết:</span>
+                <span className="info-label">Listing Price:</span>
                 <span className="info-value price">{nftData.price} ETH</span>
               </div>
             )}
 
             <div className="nft-info-item">
-              <span className="info-label">Trạng thái:</span>
+              <span className="info-label">Status:</span>
               <span
                 className={`info-value status ${
                   nftData.isListed ? "listed" : "unlisted"
                 }`}
               >
-                {nftData.isListed ? "Đã niêm yết" : "Chưa niêm yết"}
+                {nftData.isListed ? "listed" : "unlisted"}
               </span>
             </div>
           </div>
 
           <div className="nft-description-section">
-            <h3>Chú thích</h3>
+            <h3>Description</h3>
             <p className="nft-description">{nftData.description}</p>
           </div>
 
           {/* Hiển thị form niêm yết nếu là owner và NFT chưa được niêm yết */}
           {isOwner && !nftData.isListed && (
             <div className="list-nft-section">
-              <h3>Niêm yết NFT</h3>
+              <h3>List NFT</h3>
               <div className="list-form">
                 <input
                   type="number"
-                  placeholder="Nhập giá (ETH)"
+                  placeholder="Enter Price (ETH)"
                   value={listPrice}
                   onChange={(e) => setListPrice(e.target.value)}
                   className="price-input"
@@ -353,7 +353,7 @@ const NFTDetail = ({ walletAddress, signer }) => {
                   disabled={isListing}
                   className="btn-list"
                 >
-                  {isListing ? "Đang niêm yết..." : "Niêm yết"}
+                  {isListing ? "Listing..." : "List"}
                 </button>
               </div>
               {error && <p className="error-message">{error}</p>}
@@ -362,13 +362,13 @@ const NFTDetail = ({ walletAddress, signer }) => {
 
           {isOwner && nftData.isListed && (
             <div className="listed-info">
-              <p>✓ NFT của bạn đã được niêm yết trên marketplace</p>
+              <p>✓ Your NFT is listed on the marketplace</p>
             </div>
           )}
 
           {!isOwner && (
             <div className="not-owner-info">
-              <p>Bạn không phải là chủ sở hữu của NFT này</p>
+              <p>You are not the owner of this NFT</p>
             </div>
           )}
         {/* Nếu không phải owner: show Buy button when listed, with same logic as Home */}
@@ -378,9 +378,9 @@ const NFTDetail = ({ walletAddress, signer }) => {
                 onClick={handleBuyNFT}
                 disabled={isBuying}
                 className="btn-buy"
-                title={isBuying ? "Đang xử lý giao dịch..." : "Buy NFT"}
+                title={isBuying ? "Processing transaction..." : "Buy NFT"}
               >
-                {isBuying ? "⏳ Đang mua..." : `Buy for ${nftData.price} ETH`}
+                {isBuying ? "⏳ Buying..." : `Buy for ${nftData.price} ETH`}
               </button>
               {error && <p className="error-message">{error}</p>}
             </div>
@@ -389,7 +389,7 @@ const NFTDetail = ({ walletAddress, signer }) => {
           {/* Nếu không phải owner và chưa niêm yết */}
           {!isOwner && !nftData.isListed && (
             <div className="not-owner-info">
-              <p>NFT hiện không có để mua</p>
+              <p>NFT is currently unavailable for purchase</p>
             </div>
           )}
         </div>

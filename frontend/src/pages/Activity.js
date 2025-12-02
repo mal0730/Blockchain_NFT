@@ -149,7 +149,7 @@ const Activity = () => {
       <div className="activity-header">
         <h1>📊 Activity</h1>
         <p className="subtitle">
-          Theo dõi tất cả hoạt động trên NFT Marketplace
+          Track all activities on the NFT Marketplace
         </p>
       </div>
 
@@ -205,12 +205,12 @@ const Activity = () => {
           className="search-input"
           placeholder={
             searchType === "item"
-              ? "Tìm kiếm theo Item (Token ID)..."
+              ? "Search by Item (Token ID)..."
               : searchType === "from"
-              ? "Tìm kiếm theo địa chỉ From..."
+              ? "Search by From address..."
               : searchType === "to"
-              ? "Tìm kiếm theo địa chỉ To..."
-              : "Chọn ngày..."
+              ? "Search by To address..."
+              : "Select date..."
           }
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -221,11 +221,11 @@ const Activity = () => {
       {loading ? (
         <div className="loading-container">
           <div className="spinner"></div>
-          <p>Đang tải hoạt động...</p>
+          <p>Loading activities...</p>
         </div>
       ) : filteredActivities.length === 0 ? (
         <div className="empty-state">
-          <p>Chưa có hoạt động nào</p>
+          <p>No activities yet</p>
         </div>
       ) : (
         <div className="activity-table-container">

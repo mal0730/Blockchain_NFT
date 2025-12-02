@@ -35,13 +35,13 @@ const Withdraw = ({ walletAddress, signer, provider }) => {
     if (!signer) {
       setMessage({
         type: "error",
-        text: "Vui lòng kết nối ví trước!",
+        text: "Please connect your wallet first!",
       });
       return;
     }
 
     if (parseFloat(pendingAmount) === 0) {
-      setMessage({ type: "error", text: "Bạn không có tiền để rút!" });
+      setMessage({ type: "error", text: "You have no funds to withdraw!" });
       return;
     }
 
@@ -56,13 +56,13 @@ const Withdraw = ({ walletAddress, signer, provider }) => {
       );
 
       const tx = await contract.withdrawFunds();
-      setMessage({ type: "info", text: "Đang xử lý giao dịch..." });
+      setMessage({ type: "info", text: "Processing transaction..." });
 
       await tx.wait();
 
       setMessage({
         type: "success",
-        text: `Rút thành công! TX: ${tx.hash}`,
+        text: `Withdrawal successful! TX: ${tx.hash}`,
       });
 
       loadPending();
@@ -73,7 +73,7 @@ const Withdraw = ({ walletAddress, signer, provider }) => {
         text:
           error.reason ||
           error.message ||
-          "Rút tiền thất bại. Kiểm tra console!",
+          "Withdrawal failed. Check console!",
       });
     } finally {
       setLoading(false);
@@ -84,8 +84,8 @@ const Withdraw = ({ walletAddress, signer, provider }) => {
     return (
       <div className="withdraw-page">
         <div className="connect-message">
-          <h2>⚠️ Chưa kết nối ví</h2>
-          <p>Vui lòng kết nối MetaMask để sử dụng tính năng rút tiền</p>
+          <h2>⚠️ Wallet Not Connected</h2>
+          <p>Please connect MetaMask to use the withdrawal feature</p>
         </div>
       </div>
     );
@@ -94,11 +94,11 @@ const Withdraw = ({ walletAddress, signer, provider }) => {
   return (
     <div className="withdraw-page">
       <div className="withdraw-container">
-        <h1>💰 Rút tiền</h1>
-        <p className="subtitle">Nhận số tiền bạn đã bán NFT từ marketplace</p>
+        <h1>💰 Withdraw money</h1>
+        <p className="subtitle">Receive funds earned from the marketplace</p>
 
         <div className="balance-card">
-          <div className="balance-label">Số tiền chờ rút</div>
+          <div className="balance-label">Pending Withdrawal Amount</div>
           <div className="balance-amount">
             {parseFloat(pendingAmount).toFixed(6)} ETH
           </div>
@@ -113,7 +113,7 @@ const Withdraw = ({ walletAddress, signer, provider }) => {
           disabled={loading || parseFloat(pendingAmount) === 0}
           onClick={handleWithdraw}
         >
-          {loading ? "Đang xử lý..." : "Rút tiền về ví"}
+          {loading ? "Processing..." : "Withdraw to Wallet"}
         </button>
       </div>
     </div>

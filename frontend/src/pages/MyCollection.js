@@ -144,7 +144,7 @@ const MyCollection = ({ walletAddress, signer }) => {
           <input
             type="text"
             className="search-input"
-            placeholder="Tìm NFT theo tên, địa chỉ, hoặc ID..."
+            placeholder="Search NFT by name, address, or ID..."
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
           />
