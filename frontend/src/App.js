@@ -2,10 +2,13 @@ import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import "./App.css";
 import Header from "./components/Header";
+import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
 import MintNFT from "./pages/MintNFT";
 import MyCollection from "./pages/MyCollection";
 import NFTDetail from "./pages/NFTDetail";
+import Activity from "./pages/Activity";
+import Withdraw from "./pages/Withdraw";
 // Sử dụng các hàm từ wallet.js
 import { connectWallet } from "./utils/wallet";
 
@@ -86,31 +89,51 @@ function App() {
         <Header
           walletAddress={walletAddress}
           connectWallet={handleConnectWallet} // Gọi hàm mở hộp thoại MetaMask
+          provider={provider}
         />
-        <Routes>
-          <Route path="/" element={<Home walletAddress={walletAddress} signer={signer} />} />
-          <Route
-            path="/mint"
-            // TRUYỀN SIGNER XUỐNG COMPONENT MINTNFT
-            element={<MintNFT walletAddress={walletAddress} signer={signer} />}
-          />
-          <Route
-            path="/collection"
-            element={
-              <MyCollection walletAddress={walletAddress} signer={signer} />
-            }
-          />
-          <Route
-            path="/nft/:tokenId"
-            element={
-              <NFTDetail
-                walletAddress={walletAddress}
-                signer={signer}
-                provider={provider}
-              />
-            }
-          />
-        </Routes>
+        <Sidebar />
+        <main className="main-content">
+          <Routes>
+            <Route
+              path="/"
+              element={<Home walletAddress={walletAddress} signer={signer} />}
+            />
+            <Route
+              path="/mint"
+              // TRUYỀN SIGNER XUỐNG COMPONENT MINTNFT
+              element={
+                <MintNFT walletAddress={walletAddress} signer={signer} />
+              }
+            />
+            <Route
+              path="/collection"
+              element={
+                <MyCollection walletAddress={walletAddress} signer={signer} />
+              }
+            />
+            <Route
+              path="/nft/:tokenId"
+              element={
+                <NFTDetail
+                  walletAddress={walletAddress}
+                  signer={signer}
+                  provider={provider}
+                />
+              }
+            />
+            <Route path="/activity" element={<Activity />} />
+            <Route
+              path="/withdraw"
+              element={
+                <Withdraw
+                  walletAddress={walletAddress}
+                  signer={signer}
+                  provider={provider}
+                />
+              }
+            />
+          </Routes>
+        </main>
       </div>
     </Router>
   );

@@ -41,7 +41,7 @@ const NFTCard = ({ nft, onBuy }) => {
           )}
           <div className="nft-actions">
             <button className="btn-view-details" onClick={handleViewDetails}>
-              Xem chi tiết
+              View Details
             </button>
             {onBuy && nft.price && (
               <button className="btn-buy" onClick={() => onBuy(nft)}>

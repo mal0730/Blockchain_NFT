@@ -46,7 +46,7 @@ contract NFTMarketPlace is ERC721URIStorage, Ownable {
     event FundsWithdrawn(address indexed user, uint256 amount);
 
     //THAY ĐỔI: Constructor gọi ERC721URIStorage
-    constructor() ERC721("MyNFT", "MNFT") Ownable (msg.sender){}
+    constructor() ERC721("MyNFT", "MNFT") Ownable (){}
 
     // =================== NFT MINT (ĐÃ SỬA: Thêm tokenURI) ===================
     function mintNFT(uint256 royaltyPercent, string memory _tokenURI) external {

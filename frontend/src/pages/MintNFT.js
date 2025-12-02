@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./MintNFT.css";
 import { useContract } from "../utils/useContract";
@@ -7,7 +7,7 @@ import { ethers } from "ethers";
 const MintNFT = ({ walletAddress, signer }) => {
   const { contract } = useContract(signer);
   const navigate = useNavigate();
-  // thêm phí bản quyền 
+  
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -16,6 +16,53 @@ const MintNFT = ({ walletAddress, signer }) => {
   });
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
+// --- THÊM: toggle global class để disable side panel khi đang mint ---
+  useEffect(() => {
+    if (loading) {
+      document.body.classList.add("app-processing");
+    } else {
+      document.body.classList.remove("app-processing");
+    }
+    return () => {
+      document.body.classList.remove("app-processing");
+    };
+  }, [loading]);
+
+  // ✅ THÊM: Kiểm tra wallet connection
+  if (!walletAddress) {
+    return (
+      <div className="mint-nft">
+        <div className="mint-container">
+          <div className="empty-state">
+            <div className="empty-icon">🔒</div>
+            <h3>Wallet Not Connected</h3>
+            <p>Please connect your wallet to mint NFT</p>
+            <button 
+              className="btn-primary" 
+              onClick={() => navigate("/")}
+            >
+              Go to Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ THÊM: Kiểm tra contract loaded
+  if (!contract) {
+    return (
+      <div className="mint-nft">
+        <div className="mint-container">
+          <div className="empty-state">
+            <div className="empty-icon">⏳</div>
+            <h3>Loading Smart Contract</h3>
+            <p>Please wait while we initialize the contract...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -47,73 +94,66 @@ const MintNFT = ({ walletAddress, signer }) => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!contract) {
-    alert("Smart contract not loaded yet.");
-    return;
-  }
+    if (!formData.image) {
+      alert("Please select an image!");
+      return;
+    }
 
-  if (!walletAddress) {
-    alert("Please connect your wallet first!");
-    return;
-  }
+    if (!formData.name.trim()) {
+      alert("Please enter NFT name!");
+      return;
+    }
 
-  if (!formData.image) {
-    alert("Please select an image!");
-    return;
-  }
+    if (formData.royaltyPercent < 0 || formData.royaltyPercent > 100) {
+      alert("Royalty must be between 0 and 100 percent!");
+      return;
+    }
 
-  if (!formData.name.trim()) {
-    alert("Please enter NFT name!");
-    return;
-  }
+    setLoading(true);
 
-  if(formData.royaltyPercent < 0 || formData.royaltyPercent > 100) {
-    alert("Royalty must be between 0 and 100 percent!");
-    return;
-  }
+    try {
+      // 1️⃣ Upload image + metadata lên backend
+      const data = new FormData();
+      data.append("image", formData.image);
+      data.append("name", formData.name);
+      data.append("description", formData.description);
 
-  setLoading(true);
+      const response = await fetch("http://localhost:5000/api/nft/mint", {
+        method: "POST",
+        body: data,
+      });
 
-  try {
-    // 1️⃣ Upload image + metadata lên backend
-    const data = new FormData();
-    data.append("image", formData.image);
-    data.append("name", formData.name);
-    data.append("description", formData.description); 
+      if (!response.ok) throw new Error("Failed to upload NFT metadata");
 
-    const response = await fetch("http://localhost:5000/api/nft/mint", {
-      method: "POST",
-      body: data,
-    });
+      const { tokenURI } = await response.json();
+      console.log("✅ Received tokenURI from backend:", tokenURI);
 
-    if (!response.ok) throw new Error("Failed to upload NFT metadata");
+      // 2️⃣ Mint NFT lên blockchain
+      const royaltyValueForContract = ethers.toBigInt(
+        Math.round(formData.royaltyPercent * 10)
+      );
+      const tx = await contract.mintNFT(royaltyValueForContract, tokenURI);
+      console.log("⏳ Transaction sent:", tx.hash);
+      await tx.wait();
+      console.log("✅ Transaction confirmed:", tx.hash);
 
-    const { tokenURI } = await response.json();
-    console.log("✅ Received tokenURI from backend:", tokenURI);
-
-    // 2️⃣ Mint NFT lên blockchain
-
-    // Gọi smart contract
-    const royaltyValueForContract = ethers.toBigInt(Math.round(formData.royaltyPercent * 10));
-    const tx = await contract.mintNFT(royaltyValueForContract, tokenURI); // tên hàm phải đúng với contract
-    console.log("⏳ Transaction sent:", tx.hash);
-    await tx.wait();
-    console.log("✅ Transaction confirmed:", tx.hash);
-
-    alert("🎉 NFT minted successfully!");
-    navigate("/collection");
-  } catch (error) {
-    console.error("Error minting NFT:", error);
-    alert("Error minting NFT. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
-
+      alert("🎉 NFT minted successfully!");
+      navigate("/collection");
+    } catch (error) {
+      console.error("Error minting NFT:", error);
+      alert("Error minting NFT. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCancel = () => {
+    if (loading) {
+      alert("⏳ Đang mint NFT. Vui lòng chờ giao dịch hoàn tất trước khi đóng!");
+      return;
+    }
     navigate("/");
   };
 
@@ -121,9 +161,6 @@ const MintNFT = ({ walletAddress, signer }) => {
     <div className="mint-nft">
       <div className="mint-container">
         <div className="mint-header">
-          <button className="back-button" onClick={() => navigate("/")}>
-            ← Back
-          </button>
           <h1>Mint New NFT</h1>
           <p>Create your own digital collectible</p>
         </div>
@@ -136,7 +173,15 @@ const MintNFT = ({ walletAddress, signer }) => {
               </label>
               <div
                 className="image-upload"
-                onClick={() => document.getElementById("image-input").click()}
+                onClick={() => {
+                  if (!loading) {
+                    document.getElementById("image-input").click();
+                  }
+                }}
+                style={{ 
+                  pointerEvents: loading ? "none" : "auto", 
+                  opacity: loading ? 0.6 : 1 
+                }}
               >
                 {imagePreview ? (
                   <img
@@ -159,6 +204,7 @@ const MintNFT = ({ walletAddress, signer }) => {
                   accept="image/*"
                   onChange={handleImageChange}
                   style={{ display: "none" }}
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -174,6 +220,7 @@ const MintNFT = ({ walletAddress, signer }) => {
                 onChange={handleInputChange}
                 placeholder="e.g., Digital Art #1"
                 className="form-input"
+                disabled={loading}
                 required
               />
             </div>
@@ -187,6 +234,7 @@ const MintNFT = ({ walletAddress, signer }) => {
                 placeholder="Describe your NFT..."
                 className="form-textarea"
                 rows="4"
+                disabled={loading}
               />
             </div>
 
@@ -203,19 +251,21 @@ const MintNFT = ({ walletAddress, signer }) => {
                 step="0.01"
                 min="0"
                 className="form-input"
+                disabled={loading}
                 required
               />
             </div>
 
             <div className="form-actions">
               <button type="submit" className="btn-mint" disabled={loading}>
-                {loading ? "Minting..." : "Mint NFT"}
+                {loading ? "⏳ Minting..." : "🎨 Mint NFT"}
               </button>
               <button
                 type="button"
                 className="btn-cancel"
                 onClick={handleCancel}
                 disabled={loading}
+                title={loading ? "Không thể hủy khi đang mint" : "Hủy tạo NFT"}
               >
                 Cancel
               </button>
